@@ -21,9 +21,15 @@ class EmployeeAllocatorAgent(BaseAgent):
             requirement = input_data.get('requirement')
             employees = input_data.get('employees', [])
             
-            # Create task breakdown prompt
+            # Create optimized task breakdown prompt
             prompt = f"""
-You are a Senior Project Manager and Team Lead. Based on the feature specification and system architecture, break down the work into specific tasks and allocate them to team members.
+You are a Senior Project Manager and Team Lead focused on PROFIT MAXIMIZATION and EFFICIENT RESOURCE UTILIZATION. Based on the feature specification and system architecture, break down the work into specific tasks and allocate them to the MINIMUM NUMBER of team members while maximizing cost efficiency.
+
+OPTIMIZATION PRIORITIES:
+1. Use the FEWEST employees possible
+2. Prioritize cost-effective employees (lower roles when possible)
+3. Consolidate related tasks to single employees
+4. Avoid over-engineering - keep it simple and efficient
 
 Feature Specification:
 - Title: {feature_spec.get('title', 'N/A')}
@@ -37,15 +43,19 @@ System Architecture:
 - Components: {architecture.get('system_components', [])}
 - API Endpoints: {architecture.get('api_endpoints', [])}
 
-Available Team Members:
-{self._format_employees(employees)}
+Available Team Members (sorted by cost efficiency):
+{self._format_employees_with_efficiency(employees)}
 
-Please break down the work into specific, actionable tasks and allocate them to appropriate team members based on their skills and current workload.
+ALLOCATION STRATEGY:
+- Assign multiple related tasks to the same employee when possible
+- Use junior/mid-level developers over seniors when tasks allow
+- Avoid splitting simple tasks across multiple people
+- Consider current workload but prioritize consolidation
 
 For each task allocation, provide:
 1. Task title and detailed description
-2. Assigned employee and reasoning
-3. Estimated duration in hours
+2. Assigned employee and cost-efficiency reasoning
+3. Estimated duration in hours (be realistic, not padded)
 4. Priority level
 5. Dependencies
 6. Due date suggestion
@@ -68,10 +78,10 @@ Return your response in the following JSON format:
                 }}
             ],
             "total_estimated_hours": 24,
-            "allocation_reasoning": "Why this employee was chosen"
+            "allocation_reasoning": "Cost-efficiency reasoning: Why this employee was chosen and how tasks were consolidated"
         }}
     ],
-    "overall_reasoning": "Overall allocation strategy and considerations"
+    "overall_reasoning": "Overall profit-maximizing allocation strategy explaining employee minimization and cost considerations"
 }}
 """
             
@@ -147,6 +157,29 @@ Return your response in the following JSON format:
                 error=str(e)
             )
     
+    def _format_employees_with_efficiency(self, employees: List[Dict[str, Any]]) -> str:
+        """Format employee list with cost efficiency information for prompt."""
+        if not employees:
+            return "No employees available"
+        
+        formatted = []
+        for i, emp in enumerate(employees):
+            workload_pct = (emp.get('current_workload_hours', 0) / emp.get('capacity_hours_per_week', 40)) * 100
+            cost_score = emp.get('cost_efficiency_score', 1.0)
+            
+            # Add ranking indicator
+            rank_indicator = f"RANK #{i+1} (Most Efficient)" if i == 0 else f"RANK #{i+1}"
+            
+            formatted.append(
+                f"{rank_indicator} - {emp.get('name', 'Unknown')} ({emp.get('email', 'no-email')}) - "
+                f"Role: {emp.get('role', 'Unknown')}, "
+                f"Skills: {', '.join(emp.get('skills', []))}, "
+                f"Capacity: {emp.get('capacity_hours_per_week', 40)}h/week, "
+                f"Current workload: {workload_pct:.1f}%, "
+                f"Cost Efficiency Score: {cost_score:.2f} (lower = more efficient)"
+            )
+        return '\n'.join(formatted)
+
     def _format_employees(self, employees: List[Dict[str, Any]]) -> str:
         """Format employee list for prompt."""
         if not employees:

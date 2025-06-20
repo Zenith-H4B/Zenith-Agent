@@ -150,7 +150,7 @@ class EmbeddingService:
         try:
             # Get employees from database
             employees = list(db.users.find({ "org_id": ObjectId(org_id),
-                "is_on_leave": False}))
+                "is_on_leave": "FALSE"}))
             
             for employee in employees:
                 # Create skill text

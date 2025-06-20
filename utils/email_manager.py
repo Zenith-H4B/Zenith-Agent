@@ -201,6 +201,148 @@ AI Task Allocation System
                 'error': str(e),
                 'status': 'failed'
             }
+    
+    async def send_optimized_task_email(self, employee_email: str, task_data: Dict[str, Any], 
+                                      is_simple_task: bool = False) -> Dict[str, Any]:
+        """Send optimized task allocation email with urgency indicators."""
+        try:
+            logger.info(f"Sending optimized task email to {employee_email} (simple: {is_simple_task})")
+            
+            task_type = "URGENT SIMPLE TASK" if is_simple_task else "OPTIMIZED TASK ALLOCATION"
+            priority_emoji = {
+                "critical": "🔴",
+                "high": "🟠", 
+                "medium": "🟡",
+                "low": "🟢"
+            }
+            
+            priority = task_data.get('priority', 'medium')
+            emoji = priority_emoji.get(priority, "🟡")
+            
+            subject = f"{emoji} {task_type}: {task_data.get('title', 'Untitled Task')}"
+            
+            # Create optimized text body
+            if is_simple_task:
+                body = f"""
+🚀 SIMPLE TASK - QUICK ACTION REQUIRED
+
+Hello,
+
+You've been selected for this task based on optimal cost-efficiency analysis:
+
+{emoji} TASK: {task_data.get('title', 'N/A')}
+📝 DESCRIPTION: {task_data.get('description', 'N/A')}
+⏱️ ESTIMATED TIME: {task_data.get('estimated_duration', 'N/A')}
+📅 DUE: {task_data.get('due_date', 'N/A')}
+🎯 PRIORITY: {priority.upper()}
+
+💡 WHY YOU: This task was assigned to you for optimal resource utilization and cost efficiency.
+
+🎯 ACTION: Please start immediately and confirm completion.
+
+Additional Notes:
+{task_data.get('additional_details', 'None')}
+
+Best regards,
+Optimized AI Task Allocation System
+"""
+            else:
+                body = f"""
+📋 OPTIMIZED TASK ALLOCATION
+
+Hello,
+
+You have been allocated a task through our profit-optimized allocation system:
+
+{emoji} TASK: {task_data.get('title', 'N/A')}
+📝 DESCRIPTION: {task_data.get('description', 'N/A')}
+⏱️ ESTIMATED TIME: {task_data.get('estimated_duration', 'N/A')}
+📅 DUE: {task_data.get('due_date', 'N/A')}
+🎯 PRIORITY: {priority.upper()}
+
+💼 ALLOCATION REASON: You were selected based on cost-efficiency analysis and workload optimization.
+
+Please acknowledge receipt and begin work.
+
+Additional Details:
+{task_data.get('additional_details', 'None')}
+
+Best regards,
+Optimized AI Task Allocation System
+"""
+            
+            # Create enhanced HTML body
+            html_body = f"""
+<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
+        <h1 style="margin: 0;">{emoji} {'SIMPLE TASK' if is_simple_task else 'OPTIMIZED ALLOCATION'}</h1>
+        <p style="margin: 5px 0 0 0; opacity: 0.9;">Profit-optimized task assignment</p>
+    </div>
+    
+    <div style="padding: 20px; border: 1px solid #ddd; border-radius: 0 0 10px 10px;">
+        <h2 style="color: #667eea; margin-top: 0;">{task_data.get('title', 'N/A')}</h2>
+        
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #dee2e6;"><strong>📝 Description:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #dee2e6;">{task_data.get('description', 'N/A')}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #dee2e6;"><strong>🎯 Priority:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #dee2e6;">
+                        <span style="background: {'#dc3545' if priority == 'critical' else '#fd7e14' if priority == 'high' else '#ffc107' if priority == 'medium' else '#28a745'}; 
+                                     color: white; padding: 3px 8px; border-radius: 12px; font-size: 12px;">
+                            {priority.upper()}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #dee2e6;"><strong>⏱️ Duration:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #dee2e6;">{task_data.get('estimated_duration', 'N/A')}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0;"><strong>📅 Due Date:</strong></td>
+                    <td style="padding: 8px 0;">{task_data.get('due_date', 'N/A')}</td>
+                </tr>
+            </table>
+        </div>
+        
+        {'<div style="background: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 4px solid #2196f3; margin: 15px 0;"><strong>💡 Why you were selected:</strong> This task was assigned through our AI-powered cost-efficiency optimization system.</div>' if is_simple_task else ''}
+        
+        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107; margin: 15px 0;">
+            <strong>📋 Additional Details:</strong><br>
+            {task_data.get('additional_details', 'None')}
+        </div>
+        
+        <div style="text-align: center; margin: 25px 0;">
+            <p style="font-size: 16px; font-weight: bold; color: #667eea;">
+                {'🚀 Please start immediately!' if is_simple_task else '📝 Please acknowledge and begin work'}
+            </p>
+        </div>
+        
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="color: #666; font-size: 12px; text-align: center;">
+            Optimized AI Task Allocation System | Zenith Agent
+        </p>
+    </div>
+</body>
+</html>
+"""
+            
+            result = await self.send_email([employee_email], subject, body, html_body)
+            logger.info(f"Optimized task email sent to {employee_email}: {result['status']}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to send optimized task email to {employee_email}: {str(e)}")
+            return {
+                'employee_email': employee_email,
+                'error': str(e),
+                'status': 'failed'
+            }
 
 # Global email manager instance
 email_manager = EmailManager()
