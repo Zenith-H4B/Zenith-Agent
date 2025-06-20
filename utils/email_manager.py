@@ -1,9 +1,6 @@
 """SMTP client for sending emails."""
 
-import smtplib
-import asyncio
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+
 from typing import List, Dict, Any, Optional
 from loguru import logger
 from config import settings
@@ -13,10 +10,6 @@ class EmailManager:
     """Manages email sending via SMTP and Resend API."""
     
     def __init__(self):
-        self.smtp_server = settings.SMTP_SERVER
-        self.smtp_port = settings.SMTP_PORT
-        self.smtp_user = settings.SMTP_USER
-        self.smtp_password = settings.SMTP_PASSWORD
         self.email_from = settings.EMAIL_FROM
         
         # Initialize Resend if API key is available
@@ -27,65 +20,6 @@ class EmailManager:
         else:
             self.use_resend = False
             logger.info(f"EmailManager initialized with SMTP: {self.smtp_server}:{self.smtp_port}")
-    
-    async def send_email_smtp(self, to_emails: List[str], subject: str, body: str, 
-                             html_body: Optional[str] = None) -> Dict[str, Any]:
-        """Send email using SMTP."""
-        try:
-            logger.info(f"Sending email via SMTP to {len(to_emails)} recipients")
-            logger.debug(f"Subject: {subject}")
-            logger.debug(f"Recipients: {to_emails}")
-            
-            # Create message
-            msg = MIMEMultipart('alternative')
-            msg['From'] = self.email_from
-            msg['To'] = ', '.join(to_emails)
-            msg['Subject'] = subject
-            
-            # Add text part
-            msg.attach(MIMEText(body, 'plain'))
-            
-            # Add HTML part if provided
-            if html_body:
-                msg.attach(MIMEText(html_body, 'html'))
-            
-            # Send email
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.smtp_user, self.smtp_password)
-                
-                failed_recipients = []
-                successful_recipients = []
-                
-                for email in to_emails:
-                    try:
-                        server.send_message(msg, to_addrs=[email])
-                        successful_recipients.append(email)
-                        logger.debug(f"Email sent successfully to {email}")
-                    except Exception as e:
-                        failed_recipients.append({'email': email, 'error': str(e)})
-                        logger.error(f"Failed to send email to {email}: {str(e)}")
-            
-            logger.info(f"Email sending completed. Success: {len(successful_recipients)}, Failed: {len(failed_recipients)}")
-            
-            return {
-                'method': 'SMTP',
-                'subject': subject,
-                'total_recipients': len(to_emails),
-                'successful_recipients': successful_recipients,
-                'failed_recipients': failed_recipients,
-                'status': 'completed' if not failed_recipients else 'partial_failure'
-            }
-            
-        except Exception as e:
-            logger.error(f"SMTP email sending failed: {str(e)}")
-            return {
-                'method': 'SMTP',
-                'subject': subject,
-                'total_recipients': len(to_emails),
-                'error': str(e),
-                'status': 'failed'
-            }
     
     async def send_email_resend(self, to_emails: List[str], subject: str, 
                                body: str, html_body: Optional[str] = None) -> Dict[str, Any]:
@@ -147,9 +81,7 @@ class EmailManager:
             
             if self.use_resend:
                 return await self.send_email_resend(to_emails, subject, body, html_body)
-            else:
-                return await self.send_email_smtp(to_emails, subject, body, html_body)
-                
+
         except Exception as e:
             logger.error(f"Email sending failed: {str(e)}")
             return {
@@ -272,17 +204,3 @@ AI Task Allocation System
 
 # Global email manager instance
 email_manager = EmailManager()
-import os
-import resend
-#TODO : Implement email sending logic using Resend API
-resend.api_key = os.environ["RESEND_API_KEY"]
-
-params: resend.Emails.SendParams = {
-    "from": "Zenith <zenith@noreply.anirban-majumder.xyz>",
-    "to": ["delivered@resend.dev"],
-    "subject": "hello world",
-    "html": "<strong>it works!</strong>",
-}
-
-email = resend.Emails.send(params)
-print(email)

@@ -1,16 +1,32 @@
-import os
-from dotenv import load_dotenv
+"""Configuration settings for the application."""
+from pydantic_settings import BaseSettings
+from typing import Optional
 
-load_dotenv()
 
-class Settings:
-    MONGODB_URI: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-    SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.example.com")
-    SMTP_PORT: int = int(os.getenv("SMTP_PORT", 587))
-    SMTP_USER: str = os.getenv("SMTP_USER", "user@example.com")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "password")
-    EMAIL_FROM: str = os.getenv("EMAIL_FROM", "noreply@example.com")
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+class Settings(BaseSettings):
+    """Application settings."""
+    
+    # MongoDB
+    MONGODB_URI: str = "mongodb://localhost:27017"
+    
+    # Google Gemini
+    GOOGLE_API_KEY: str
+    
+    # Email settings
+    EMAIL_FROM: str = "noreply@yourcompany.com"
+    RESEND_API_KEY: Optional[str] = None
+    
+    # FAISS settings
+    FAISS_INDEX_PATH: str = "data/faiss_index"
+    EMBEDDINGS_PATH: str = "data/embeddings"
+    
+    # Application settings
+    MAX_WORKERS: int = 4
+    LOG_LEVEL: str = "INFO"
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
 
 settings = Settings()
