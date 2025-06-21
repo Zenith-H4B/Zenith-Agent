@@ -1,57 +1,91 @@
-from fastapi import APIRouter, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Response
+from fastapi.responses import StreamingResponse, JSONResponse
 from agents.LogCleanupAgent import LogCleanupAgent
 import asyncio
 import threading
-import queue
+import os
+import time
+from logs.log_buffer import log_buffer
 
 router = APIRouter()
 
-# Thread-safe queue for log lines
-data_queue = queue.Queue()
+LOG_FILE = "logs/app.log"
+CACHE_FILE = "logs/log_cache.txt"
 
-# Background thread function for log cleanup and streaming
-def log_cleanup_thread():
-    agent = LogCleanupAgent()
-    log_path = "logs/app.log"
+# Background thread: tail app.log into cache file
+def log_cache_updater():
     last_pos = 0
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     while True:
         try:
-            with open(log_path, "r") as f:
+            with open(LOG_FILE, "r") as src, open(CACHE_FILE, "a+") as cache:
+                src.seek(last_pos)
+                lines = src.readlines()
+                last_pos = src.tell()
+                if lines:
+                    cache.writelines(lines)
+                    cache.flush()
+            time.sleep(1)
+        except Exception:
+            time.sleep(2)
+
+# Ensure single background thread
+def start_log_cache_thread_once():
+    if not hasattr(start_log_cache_thread_once, "started"):
+        t = threading.Thread(target=log_cache_updater, daemon=True)
+        t.start()
+        start_log_cache_thread_once.started = True
+
+# Async generator: read cache, clean via agent, stream as SSE
+async def log_streamer():
+    start_log_cache_thread_once()
+    agent = LogCleanupAgent()
+    last_pos = 0
+    while True:
+        try:
+            if not os.path.exists(CACHE_FILE):
+                await asyncio.sleep(1)
+                continue
+
+            with open(CACHE_FILE, "r") as f:
                 f.seek(last_pos)
                 new_lines = f.readlines()
                 last_pos = f.tell()
+
             if new_lines:
-                # Use the agent to clean up logs
-                response = loop.run_until_complete(agent.process({"raw_logs": new_lines}))
-                cleaned = response.data.get("cleaned_logs", [])
-                for line in cleaned:
-                    data_queue.put(line + "\n")
-            loop.run_until_complete(asyncio.sleep(1))
-        except Exception as e:
-            data_queue.put(f"Error streaming logs: {str(e)}\n")
-            loop.run_until_complete(asyncio.sleep(2))
+                # Clean the raw logs
+                cleaned_resp = await agent.process({"raw_logs": new_lines})
+                cleaned = cleaned_resp.data.get("cleaned_logs", [])
+                for ln in cleaned:
+                    # Format as SSE message
+                    yield f"data: {ln}\n\n"
 
-# Start the background thread only once
-def start_log_thread_once():
-    if not hasattr(start_log_thread_once, "started"):
-        t = threading.Thread(target=log_cleanup_thread, daemon=True)
-        t.start()
-        start_log_thread_once.started = True
-
-async def log_streamer():
-    start_log_thread_once()
-    while True:
-        try:
-            line = data_queue.get()
-            yield line
+            await asyncio.sleep(1)
         except Exception as e:
-            yield f"Error streaming logs: {str(e)}\n"
+            yield f"data: Error streaming logs: {str(e)}\n\n"
             await asyncio.sleep(2)
 
 @router.get("/logs/stream")
 async def stream_logs():
-    """Stream cleaned agent logs in a chunked HTTP response."""
-    return StreamingResponse(log_streamer(), media_type="text/plain")
+    """Stream cleaned logs as Server-Sent Events (SSE) from cache."""
+    return StreamingResponse(
+        log_streamer(),
+        media_type="text/event-stream",
+    )
+
+@router.get("/logs/all")
+async def get_all_logs():
+    """Return all cleaned logs as a JSON array for frontend display."""
+    agent = LogCleanupAgent()
+    if not os.path.exists(CACHE_FILE):
+        return JSONResponse(content={"logs": []})
+    with open(CACHE_FILE, "r") as f:
+        raw_logs = f.readlines()
+    response = await agent.process({"raw_logs": raw_logs})
+    cleaned_logs = response.data.get("cleaned_logs", [])
+    return JSONResponse(content={"logs": cleaned_logs})
+
+@router.get("/logs/showcase")
+async def get_logs():
+    log_buffer.seek(0)
+    logs = log_buffer.read()
+    return Response(content=logs, media_type="text/plain")

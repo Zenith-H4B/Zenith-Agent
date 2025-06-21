@@ -22,7 +22,7 @@ class EmailManager:
             logger.info(f"EmailManager initialized with SMTP: {self.smtp_server}:{self.smtp_port}")
     
     async def send_email_resend(self, to_emails: List[str], subject: str, 
-                               body: str, html_body: Optional[str] = None) -> Dict[str, Any]:
+                                body: str, html_body: Optional[str] = None) -> Dict[str, Any]:
         """Send email using Resend API."""
         try:
             logger.info(f"Sending email via Resend API to {len(to_emails)} recipients")
