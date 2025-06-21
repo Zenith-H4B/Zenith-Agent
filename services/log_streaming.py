@@ -84,7 +84,7 @@ async def get_all_logs():
     cleaned_logs = response.data.get("cleaned_logs", [])
     return JSONResponse(content={"logs": cleaned_logs})
 
-@router.get("/logs/showcase")
+@router.post("/logs/showcase")
 async def get_logs():
     log_buffer.seek(0)
     logs = log_buffer.read()

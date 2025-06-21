@@ -641,19 +641,19 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
                     db.tasks.insert_one(task_doc)
             
             # Log optimization summary
-            logger.info(f"Optimization Summary:")
-            logger.info(f"  - Task Complexity: {state.get('task_complexity')} (AI confidence: {classification_details.get('confidence', 0.5):.2f})")
-            logger.info(f"  - AI Estimated Hours: {classification_details.get('estimated_hours', 4)}")
-            logger.info(f"  - Required Skills: {', '.join(classification_details.get('required_skills', [])) if classification_details.get('required_skills') else 'General'}")
-            logger.info(f"  - Employees Used: {employees_used}")
-            logger.info(f"  - Total Tasks: {total_tasks}")
-            logger.info(f"  - Total Hours: {total_hours}")
-            logger.info(f"  - Avg Cost Efficiency: {avg_cost_efficiency:.2f}")
-            logger.info(f"  - Workflow Path: {'Simplified' if state.get('task_complexity') == 'simple' else 'Full'}")
-            logger.info(f"  - Classification Reasoning: {classification_details.get('reasoning', 'N/A')[:100]}...")
+            logger.info(f"$$$$Optimization Summary:")
+            logger.info(f"$$$$  - Task Complexity: {state.get('task_complexity')} (AI confidence: {classification_details.get('confidence', 0.5):.2f})")
+            logger.info(f"$$$$  - AI Estimated Hours: {classification_details.get('estimated_hours', 4)}")
+            logger.info(f"$$$$  - Required Skills: {', '.join(classification_details.get('required_skills', [])) if classification_details.get('required_skills') else 'General'}")
+            logger.info(f"$$$$  - Employees Used: {employees_used}")
+            logger.info(f"$$$$  - Total Tasks: {total_tasks}")
+            logger.info(f"$$$$  - Total Hours: {total_hours}")
+            logger.info(f"$$$$  - Avg Cost Efficiency: {avg_cost_efficiency:.2f}")
+            logger.info(f"$$$$  - Workflow Path: {'Simplified' if state.get('task_complexity') == 'simple' else 'Full'}")
+            logger.info(f"$$$$  - Classification Reasoning: {classification_details.get('reasoning', 'N/A')[:100]}...")
             
         except Exception as e:
-            logger.error(f"$$$$Error saving optimized results: {str(e)}")
+            logger.error(f"Error saving optimized results: {str(e)}")
             state["errors"].append(f"Save error: {str(e)}")
         
         return state
