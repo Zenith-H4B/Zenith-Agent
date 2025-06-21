@@ -40,5 +40,12 @@ class BaseAgent(ABC):
             return response
         except Exception as e:
             logger.error(f"Error generating structured response in {self.name}: {str(e)}")
+            logger.error(f"Prompt was: {prompt[:500]}...")
+            
+            # Try to provide more helpful error information
+            if "validation errors" in str(e):
+                logger.error("Pydantic validation failed. The LLM response doesn't match the expected schema.")
+                logger.error("Check that the prompt clearly specifies all required fields.")
+            
             raise
 

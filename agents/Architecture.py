@@ -45,7 +45,10 @@ Please design a system architecture including:
 
 Provide comprehensive and detailed information for each field.
 """
-            
+            logger.info("Generating system architecture based on feature spec and requirement...")
+            logger.debug(f"Feature Spec: {feature_spec}")
+            logger.debug(f"Requirement: {requirement}")
+            logger.debug(f"Organization Context: {org_context}")    
             # Generate structured response
             response_data = await self._generate_structured_response(prompt, SystemArchitectureResponse)
             

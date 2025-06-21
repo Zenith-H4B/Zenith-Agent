@@ -51,13 +51,23 @@ ALLOCATION STRATEGY:
 - Avoid splitting simple tasks across multiple people
 - Consider current workload but prioritize consolidation
 
-For each task allocation, provide:
-1. Task title and detailed description
-2. Assigned employee and cost-efficiency reasoning
-3. Estimated duration in hours (be realistic, not padded)
-4. Priority level
-5. Dependencies
-6. Due date suggestion (in YYYY-MM-DD format)
+IMPORTANT: For each employee allocation, you MUST provide:
+1. employee_id: Use the employee ID from the available team members list
+2. employee_email: Use the email from the available team members list  
+3. employee_name: Use the name from the available team members list
+4. tasks: List of tasks with all required fields
+5. total_estimated_hours: Sum of all task hours
+6. allocation_reasoning: Detailed cost-efficiency reasoning
+
+For each task, provide:
+1. title: Clear task title
+2. description: Detailed task description
+3. priority: One of "low", "medium", "high", "critical"
+4. estimated_duration_hours: Realistic hours estimate
+5. due_date: Date in YYYY-MM-DD format
+6. additional_details: Any extra context (optional)
+
+CRITICAL: Ensure you extract the correct employee_id, employee_email, and employee_name from the team members list provided above.
 
 Provide comprehensive task allocations with profit-maximizing employee selection strategy.
 """
@@ -132,7 +142,9 @@ Provide comprehensive task allocations with profit-maximizing employee selection
             rank_indicator = f"RANK #{i+1} (Most Efficient)" if i == 0 else f"RANK #{i+1}"
             
             formatted.append(
-                f"{rank_indicator} - {emp.get('name', 'Unknown')} ({emp.get('email', 'no-email')}) - "
+                f"{rank_indicator} - ID: {emp.get('id', 'unknown-id')}, "
+                f"Name: {emp.get('name', 'Unknown')}, "
+                f"Email: {emp.get('email', 'no-email')}, "
                 f"Role: {emp.get('role', 'Unknown')}, "
                 f"Skills: {', '.join(emp.get('skills', []))}, "
                 f"Capacity: {emp.get('capacity_hours_per_week', 40)}h/week, "
