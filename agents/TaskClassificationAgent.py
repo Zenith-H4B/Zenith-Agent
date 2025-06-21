@@ -2,9 +2,7 @@
 from typing import Dict, Any, Optional
 from loguru import logger
 from .agents import BaseAgent
-from models.models import ProductRequirement, AgentResponse
-import json
-import re
+from models.models import ProductRequirement, AgentResponse, TaskClassificationResponse
 
 
 class TaskClassificationAgent(BaseAgent):
@@ -88,91 +86,36 @@ Additional Considerations:
 - Consider deployment complexity
 
 Analyze the requirement and provide your classification with detailed reasoning.
+Ensure the classification field is exactly "simple" or "complex".
+"""
 
-Respond in this exact JSON format:
-{{
-    "classification": "simple" or "complex",
-    "confidence": 0.0 to 1.0,
-    "reasoning": "Detailed explanation of why this task is classified as simple or complex",
-    "estimated_hours": estimated hours to complete,
-    "risk_factors": ["list", "of", "potential", "risks"],
-    "required_skills": ["list", "of", "technical", "skills", "needed"],
-    "dependencies": ["list", "of", "dependencies", "if", "any"]
-}}"""
-
-            # Get classification from Gemini model
-            response_text = await self._generate_response(classification_prompt)
+            # Generate structured response
+            response_data = await self._generate_structured_response(classification_prompt, TaskClassificationResponse)
             
-            # Parse the response
-            try:
-                # Extract JSON from response
-                response_text = response_text.strip()
-                
-                # Try to find JSON in the response
-                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group(0)
-                    classification_data = json.loads(json_str)
-                else:
-                    # Fallback parsing if no clear JSON structure
-                    raise ValueError("No JSON structure found in response")
-                
-                # Validate required fields
-                if "classification" not in classification_data:
-                    raise ValueError("Missing classification field")
-                
-                classification = classification_data["classification"].lower()
-                if classification not in ["simple", "complex"]:
-                    raise ValueError(f"Invalid classification: {classification}")
-                
-                # Extract other fields with defaults
-                confidence = classification_data.get("confidence", 0.5)
-                reasoning = classification_data.get("reasoning", "Classification provided without detailed reasoning")
-                estimated_hours = classification_data.get("estimated_hours", 4)
-                risk_factors = classification_data.get("risk_factors", [])
-                required_skills = classification_data.get("required_skills", [])
-                dependencies = classification_data.get("dependencies", [])
-                
-                result_data = {
-                    "classification": classification,
-                    "confidence": confidence,
-                    "reasoning": reasoning,
-                    "estimated_hours": estimated_hours,
-                    "risk_factors": risk_factors,
-                    "required_skills": required_skills,
-                    "dependencies": dependencies,
-                    "agent_used": "TaskClassificationAgent"
-                }
-                
-                logger.info(f"Task classified as: {classification} (confidence: {confidence:.2f})")
-                logger.info(f"Reasoning: {reasoning[:200]}...")
-                
-                return AgentResponse(
-                    success=True,
-                    data=result_data,
-                    agent_name="TaskClassificationAgent"
-                )
-                
-            except (json.JSONDecodeError, ValueError, KeyError) as parse_error:
-                logger.warning(f"Failed to parse LLM response, using fallback classification: {str(parse_error)}")
-                
-                # Fallback to keyword-based classification
-                fallback_classification = self._fallback_classification(requirement)
-                
-                return AgentResponse(
-                    success=True,
-                    data={
-                        "classification": fallback_classification,
-                        "confidence": 0.3,  # Lower confidence for fallback
-                        "reasoning": f"Used fallback classification due to parsing error: {str(parse_error)}",
-                        "estimated_hours": 4,
-                        "risk_factors": ["Classification uncertainty"],
-                        "required_skills": ["General development"],
-                        "dependencies": [],
-                        "agent_used": "TaskClassificationAgent (fallback)"
-                    },
-                    agent_name="TaskClassificationAgent"
-                )
+            # Validate classification
+            if response_data.classification not in ["simple", "complex"]:
+                logger.warning(f"Invalid classification received: {response_data.classification}, defaulting to 'complex'")
+                response_data.classification = "complex"
+            
+            result_data = {
+                "classification": response_data.classification,
+                "confidence": response_data.confidence,
+                "reasoning": response_data.reasoning,
+                "estimated_hours": response_data.estimated_hours,
+                "risk_factors": response_data.risk_factors,
+                "required_skills": response_data.required_skills,
+                "dependencies": response_data.dependencies,
+                "agent_used": "TaskClassificationAgent"
+            }
+            
+            logger.info(f"Task classified as: {response_data.classification} (confidence: {response_data.confidence:.2f})")
+            logger.info(f"Reasoning: {response_data.reasoning[:200]}...")
+            
+            return AgentResponse(
+                success=True,
+                data=result_data,
+                agent_name="TaskClassificationAgent"
+            )
                 
         except Exception as e:
             logger.error(f"Error in task classification: {str(e)}")
@@ -218,3 +161,36 @@ Respond in this exact JSON format:
             )
         
         return await self.classify_task_complexity(requirement, org_context)
+    
+    def _fallback_classification(self, requirement: ProductRequirement) -> str:
+        """
+        Fallback classification based on keywords when LLM parsing fails.
+        
+        Args:
+            requirement: The product requirement to classify
+            
+        Returns:
+            Classification as 'simple' or 'complex'
+        """
+        requirement_text = requirement.requirement_text.lower()
+        
+        # Keywords that typically indicate simple tasks
+        simple_keywords = [
+            'fix', 'bug', 'update', 'change', 'modify', 'text', 'color', 'style',
+            'config', 'setting', 'typo', 'copy', 'documentation', 'readme',
+            'comment', 'variable', 'constant', 'toggle', 'enable', 'disable'
+        ]
+        
+        # Keywords that typically indicate complex tasks
+        complex_keywords = [
+            'implement', 'develop', 'create', 'build', 'design', 'architecture',
+            'database', 'api', 'integration', 'authentication', 'authorization',
+            'security', 'performance', 'optimization', 'refactor', 'migration',
+            'machine learning', 'ai', 'algorithm', 'service', 'microservice'
+        ]
+        
+        simple_score = sum(1 for keyword in simple_keywords if keyword in requirement_text)
+        complex_score = sum(1 for keyword in complex_keywords if keyword in requirement_text)
+        
+        # Default to complex if scores are equal or no keywords found
+        return 'simple' if simple_score > complex_score else 'complex'

@@ -1,10 +1,8 @@
 from agents import BaseAgent
-from models import  Priority,AgentResponse,FeatureSpec
+from models import Priority, AgentResponse, FeatureSpec
+from models.models import FeatureSpecResponse
 from typing import Dict, Any
-import json
 from loguru import logger
-
-
 
 
 class ProductManagerAgent(BaseAgent):
@@ -40,58 +38,31 @@ Please provide a detailed analysis and create feature specifications including:
 4. Priority assessment
 5. Effort estimation (in story points or time)
 6. Dependencies
+7. Your reasoning for this specification
 
-Return your response in the following JSON format:
-{{
-    "title": "Feature title",
-    "description": "Detailed description",
-    "user_stories": ["As a user...", "As a admin..."],
-    "acceptance_criteria": ["Given when then...", "Given when then..."],
-    "priority": "high|medium|low|critical",
-    "estimated_effort": "X story points / X weeks",
-    "dependencies": ["List of dependencies"],
-    "reasoning": "Your reasoning for this specification"
-}}
+Ensure all fields are properly filled out with meaningful content.
 """
             
-            response_text = await self._generate_response(prompt)
+            # Generate structured response
+            response_data = await self._generate_structured_response(prompt, FeatureSpecResponse)
             
-            # Parse JSON response
-            try:
-                # Extract JSON from response
-                json_start = response_text.find('{')
-                json_end = response_text.rfind('}') + 1
-                json_str = response_text[json_start:json_end]
-                
-                response_data = json.loads(json_str)
-                
-                # Create FeatureSpec object
-                feature_spec = FeatureSpec(
-                    title=response_data.get('title', 'Untitled Feature'),
-                    description=response_data.get('description', ''),
-                    user_stories=response_data.get('user_stories', []),
-                    acceptance_criteria=response_data.get('acceptance_criteria', []),
-                    priority=Priority(response_data.get('priority', 'medium')),
-                    estimated_effort=response_data.get('estimated_effort', 'TBD'),
-                    dependencies=response_data.get('dependencies', [])
-                )
-                
-                return AgentResponse(
-                    agent_name=self.name,
-                    success=True,
-                    data={'feature_spec': feature_spec.dict()},
-                    reasoning=response_data.get('reasoning', 'Feature specification generated successfully')
-                )
-                
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON response: {str(e)}")
-                # Fallback to basic parsing
-                return AgentResponse(
-                    agent_name=self.name,
-                    success=False,
-                    data={},
-                    error=f"Failed to parse response: {str(e)}"
-                )
+            # Create FeatureSpec object from structured response
+            feature_spec = FeatureSpec(
+                title=response_data.title,
+                description=response_data.description,
+                user_stories=response_data.user_stories,
+                acceptance_criteria=response_data.acceptance_criteria,
+                priority=response_data.priority,
+                estimated_effort=response_data.estimated_effort,
+                dependencies=response_data.dependencies
+            )
+            
+            return AgentResponse(
+                agent_name=self.name,
+                success=True,
+                data={'feature_spec': feature_spec.dict()},
+                reasoning=response_data.reasoning
+            )
                 
         except Exception as e:
             logger.error(f"Error in ProductManagerAgent: {str(e)}")
