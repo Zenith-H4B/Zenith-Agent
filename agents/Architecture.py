@@ -70,7 +70,48 @@ Return your response in the following JSON format:
                 def transform_to_list(data):
                     """Transform dict/nested structure to flat list."""
                     if isinstance(data, list):
-                        return data
+                        result = []
+                        for item in data:
+                            if isinstance(item, dict):
+                                # Handle system components format: {'component': 'name', 'responsibilities': [...]}
+                                if 'component' in item:
+                                    component_name = item['component']
+                                    responsibilities = item.get('responsibilities', [])
+                                    if responsibilities:
+                                        resp_text = '; '.join(responsibilities) if isinstance(responsibilities, list) else str(responsibilities)
+                                        result.append(f"{component_name}: {resp_text}")
+                                    else:
+                                        result.append(component_name)
+                                # Handle API endpoints format: {'endpoint': '/path', 'method': 'GET', ...}
+                                elif 'endpoint' in item:
+                                    endpoint = item['endpoint']
+                                    method = item.get('method', '')
+                                    description = item.get('description', '')
+                                    auth_required = item.get('authentication_required', False)
+                                    auth_level = item.get('authorization_required', '')
+                                    
+                                    endpoint_str = f"{method} {endpoint}"
+                                    if description:
+                                        endpoint_str += f" - {description}"
+                                    if auth_required:
+                                        endpoint_str += f" (Auth required"
+                                        if auth_level:
+                                            endpoint_str += f": {auth_level}"
+                                        endpoint_str += ")"
+                                    result.append(endpoint_str)
+                                # Handle general dictionaries
+                                else:
+                                    parts = []
+                                    for key, value in item.items():
+                                        if isinstance(value, list):
+                                            value_str = '; '.join(str(v) for v in value)
+                                            parts.append(f"{key}: {value_str}")
+                                        else:
+                                            parts.append(f"{key}: {value}")
+                                    result.append(' | '.join(parts))
+                            else:
+                                result.append(str(item))
+                        return result
                     elif isinstance(data, dict):
                         # Extract all values if it's a nested dict
                         result = []
@@ -96,6 +137,27 @@ Return your response in the following JSON format:
                             if isinstance(value, dict):
                                 sub_parts = [f"  {k}: {v}" for k, v in value.items()]
                                 parts.append(f"{key}:\n" + "\n".join(sub_parts))
+                            elif isinstance(value, list):
+                                if all(isinstance(item, dict) for item in value):
+                                    # Handle list of dictionaries (like tables)
+                                    formatted_items = []
+                                    for item in value:
+                                        if isinstance(item, dict):
+                                            item_parts = []
+                                            for k, v in item.items():
+                                                if isinstance(v, list):
+                                                    v_str = ', '.join(str(x) for x in v)
+                                                    item_parts.append(f"{k}: [{v_str}]")
+                                                else:
+                                                    item_parts.append(f"{k}: {v}")
+                                            formatted_items.append("  " + " | ".join(item_parts))
+                                        else:
+                                            formatted_items.append(f"  {item}")
+                                    parts.append(f"{key}:\n" + "\n".join(formatted_items))
+                                else:
+                                    # Handle simple list
+                                    formatted_list = ', '.join(str(item) for item in value)
+                                    parts.append(f"{key}: {formatted_list}")
                             else:
                                 parts.append(f"{key}: {value}")
                         return "\n".join(parts)
@@ -108,6 +170,10 @@ Return your response in the following JSON format:
                 database_schema = transform_to_string(response_data.get('database_schema'))
                 api_endpoints = transform_to_list(response_data.get('api_endpoints', []))
                 security_considerations = transform_to_list(response_data.get('security_considerations', []))
+                
+                logger.debug(f"Transformed tech_stack: {tech_stack}")
+                logger.debug(f"Transformed system_components: {system_components}")
+                logger.debug(f"Transformed api_endpoints: {api_endpoints}")
                 
                 # Create SystemArchitecture object
                 architecture = SystemArchitecture(

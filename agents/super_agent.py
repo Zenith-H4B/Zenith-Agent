@@ -43,7 +43,7 @@ class OptimizedSuperAgent:
         workflow.add_node("simple_task_handler", self._handle_simple_task)
         workflow.add_node("product_manager", self._run_product_manager)
         workflow.add_node("architect", self._run_architect)
-        workflow.add_node("optimized_allocator", self._run_optimized_allocator)
+        workflow.add_node("employee_allocator", self._run_employee_allocator)
         workflow.add_node("send_emails", self._send_emails)
         workflow.add_node("save_results", self._save_results)
         
@@ -67,8 +67,8 @@ class OptimizedSuperAgent:
         
         # Complex task flow
         workflow.add_edge("product_manager", "architect")
-        workflow.add_edge("architect", "optimized_allocator")
-        workflow.add_edge("optimized_allocator", "send_emails")
+        workflow.add_edge("architect", "employee_allocator")
+        workflow.add_edge("employee_allocator", "send_emails")
         
         # Final steps
         workflow.add_edge("send_emails", "save_results")
@@ -429,152 +429,39 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
         
         return state
     
-    async def _run_optimized_allocator(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """Run optimized employee allocator focused on minimal employees and max profit."""
+    async def _run_employee_allocator(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Run the Employee Allocator Agent."""
         try:
-            logger.info("Running Optimized Employee Allocator Agent")
+            logger.info("Running Employee Allocator Agent")
             
             if not state["feature_spec"] or not state["architecture"]:
                 logger.warning("Missing feature spec or architecture, skipping Employee Allocator")
                 return state
             
-            employees = state["employees"]
-            cost_efficient_employees = self._calculate_employee_cost_efficiency(employees)
-            
             input_data = {
                 "feature_spec": state["feature_spec"],
                 "architecture": state["architecture"],
                 "requirement": state["requirement"],
-                "employees": cost_efficient_employees  # Use sorted employees
+                "employees": state["employees"]
             }
             
-            # Enhance the allocator prompt for optimization
-            original_response = await self.employee_allocator.process(input_data)
+            response = await self.employee_allocator.process(input_data)
             
-            if original_response.success:
-                task_allocations = original_response.data.get("task_allocations", [])
-                
-                # Post-process to optimize allocations
-                optimized_allocations = self._optimize_task_allocations(task_allocations, cost_efficient_employees)
-                
-                state["task_allocations"] = optimized_allocations
-                logger.info(f"Optimized allocator completed with {len(optimized_allocations)} allocations")
+            if response.success:
+                state["task_allocations"] = response.data.get("task_allocations", [])
+                logger.info(f"Employee Allocator completed with {len(state['task_allocations'])} allocations")
+                logger.info(f"Task Allocations: {state['task_allocations']}")
             else:
-                logger.error(f"Optimized Employee Allocator failed: {original_response.error}")
-                state["errors"].append(f"Optimized Employee Allocator error: {original_response.error}")
+                logger.error(f"Employee Allocator failed: {response.error}")
+                state["errors"].append(f"Employee Allocator error: {response.error}")
                 state["success"] = False
                 
         except Exception as e:
-            logger.error(f"Error in Optimized Employee Allocator Agent: {str(e)}")
-            state["errors"].append(f"Optimized Employee Allocator error: {str(e)}")
+            logger.error(f"Error in Employee Allocator Agent: {str(e)}")
+            state["errors"].append(f"Employee Allocator error: {str(e)}")
             state["success"] = False
         
         return state
-    
-    def _optimize_task_allocations(self, allocations: List[Dict], employees: List[Dict]) -> List[Dict]:
-        """Optimize task allocations to use fewer employees and maximize profit."""
-        if not allocations:
-            return allocations
-        
-        logger.info("Optimizing task allocations for minimal employees and maximum profit")
-        
-        # Create employee lookup
-        emp_lookup = {str(emp.get('_id')): emp for emp in employees}
-        
-        # Consolidate tasks where possible
-        optimized = []
-        all_tasks = []
-        
-        # Collect all tasks
-        for alloc in allocations:
-            for task in alloc.get("tasks", []):
-                task["original_employee_id"] = alloc.get("employee_id")
-                task["original_employee_email"] = alloc.get("employee_email")
-                task["original_employee_name"] = alloc.get("employee_name")
-                all_tasks.append(task)
-        
-        # Sort tasks by priority and estimated hours
-        priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-        all_tasks.sort(key=lambda t: (
-            priority_order.get(t.get("priority", "medium"), 2),
-            -t.get("estimated_duration_hours", 0)  # Higher duration first for better consolidation
-        ))
-        
-        # Reassign tasks to minimize employees used
-        employee_assignments = {}
-        
-        for task in all_tasks:
-            best_employee = None
-            min_cost_score = float('inf')
-            
-            # Find best employee for this task
-            for emp in employees:
-                emp_id = str(emp.get('_id'))
-                
-                # Calculate current load for this employee
-                current_hours = sum(
-                    t.get("estimated_duration_hours", 0) 
-                    for tasks in employee_assignments.get(emp_id, {}).get("tasks", [])
-                    for t in [tasks]
-                )
-                
-                # Check if employee can handle the additional load
-                capacity = emp.get('capacity_hours_per_week', 40)
-                current_workload = emp.get('current_workload_hours', 0)
-                available_hours = capacity - current_workload
-                
-                if current_hours + task.get("estimated_duration_hours", 0) <= available_hours:
-                    # Calculate cost efficiency
-                    cost_score = emp.get('cost_efficiency_score', 1.0)
-                    
-                    # Bonus for already assigned employees (consolidation)
-                    if emp_id in employee_assignments:
-                        cost_score *= 0.7  # 30% bonus for consolidation
-                    
-                    if cost_score < min_cost_score:
-                        min_cost_score = cost_score
-                        best_employee = emp
-            
-            # Assign task to best employee
-            if best_employee:
-                emp_id = str(best_employee.get('_id'))
-                if emp_id not in employee_assignments:
-                    employee_assignments[emp_id] = {
-                        "employee_id": emp_id,
-                        "employee_email": best_employee.get('email'),
-                        "employee_name": best_employee.get('name'),
-                        "tasks": [],
-                        "total_estimated_hours": 0,
-                        "allocation_reasoning": ""
-                    }
-                
-                employee_assignments[emp_id]["tasks"].append(task)
-                employee_assignments[emp_id]["total_estimated_hours"] += task.get("estimated_duration_hours", 0)
-        
-        # Create final allocations with reasoning
-        for emp_id, assignment in employee_assignments.items():
-            emp = emp_lookup.get(emp_id)
-            if emp:
-                task_count = len(assignment["tasks"])
-                total_hours = assignment["total_estimated_hours"]
-                cost_score = emp.get('cost_efficiency_score', 1.0)
-                
-                assignment["allocation_reasoning"] = (
-                    f"Optimized allocation: {task_count} tasks totaling {total_hours}h assigned to "
-                    f"{assignment['employee_name']} (cost efficiency: {cost_score:.2f}, "
-                    f"role: {emp.get('role', 'unknown')}). Chosen for optimal cost-benefit ratio."
-                )
-                
-                optimized.append(assignment)
-        
-        logger.info(f"Optimization complete: Reduced from {len(allocations)} to {len(optimized)} employees")
-        logger.info(f"Total tasks allocated: {sum(len(a['tasks']) for a in optimized)}")
-        
-        return optimized
-    
-    async def _run_employee_allocator(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """Legacy method - redirects to optimized allocator."""
-        return await self._run_optimized_allocator(state)
     
     async def _send_emails(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Send optimized task allocation emails."""

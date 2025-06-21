@@ -18,7 +18,7 @@ class BaseAgent(ABC):
     def __init__(self, name: str):
         self.name = name
         genai.configure(api_key=settings.GOOGLE_API_KEY)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        self.model = genai.GenerativeModel('gemini-2.5-flash')
         logger.info(f"Initialized {self.name}")
     
     @abstractmethod

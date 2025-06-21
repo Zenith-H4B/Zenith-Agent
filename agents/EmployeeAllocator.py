@@ -73,7 +73,7 @@ Return your response in the following JSON format:
                     "description": "Detailed task description",
                     "priority": "high|medium|low|critical",
                     "estimated_duration_hours": 8,
-                    "due_date": "2025-01-15",
+                    "due_date": "2025-06-25",
                     "additional_details": "Any additional context"
                 }}
             ],
