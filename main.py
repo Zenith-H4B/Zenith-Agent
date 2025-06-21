@@ -13,6 +13,7 @@ from models.models import ProductRequirement, ProcessingResult, Organization, Em
 from agents.super_agent import super_agent
 from database.database import db
 from utils.embedding_service import embedding_service
+from services.log_streaming import router as log_streaming_router
 
 
 # Configure logging
@@ -26,6 +27,9 @@ app = FastAPI(
     description="Multi-agent system for product requirement analysis and task allocation",
     version="1.0.0"
 )
+
+# Register log streaming router
+app.include_router(log_streaming_router)
 
 # Add CORS middleware
 app.add_middleware(
