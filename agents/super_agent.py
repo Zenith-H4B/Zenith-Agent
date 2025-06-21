@@ -13,7 +13,7 @@ from agents.ProductManager import ProductManagerAgent
 from agents.Architecture import ArchitectureAgent
 from agents.EmployeeAllocator import EmployeeAllocatorAgent
 from agents.TaskClassificationAgent import TaskClassificationAgent
-from models import ProductRequirement, ProcessingResult, AgentResponse, Task, Priority
+from models import ProductRequirement, ProcessingResult, AgentResponse, Task, Priority, FeatureSpec
 from database.database import db
 from utils.embedding_service import embedding_service
 from utils.email_manager import email_manager
@@ -112,7 +112,7 @@ class OptimizedSuperAgent:
         try:
             requirement = state["requirement"]
             org_data = state.get("org_data")
-            logger.info("Analyzing task complexity using TaskClassificationAgent")
+            logger.info("$$$$Analyzing task complexity using TaskClassificationAgent")
             
             # Use TaskClassificationAgent for intelligent classification
             input_data = {
@@ -143,7 +143,7 @@ class OptimizedSuperAgent:
                 logger.info(f"Reasoning: {reasoning[:200]}...")
                 
             else:
-                logger.error(f"TaskClassificationAgent failed: {classification_response.error}")
+                logger.error(f"$$$$TaskClassificationAgent failed: {classification_response.error}")
                 state["errors"].append(f"Task classification error: {classification_response.error}")
                 state["task_complexity"] = "complex"  # Default to complex on error
                 state["classification_details"] = {
@@ -156,7 +156,7 @@ class OptimizedSuperAgent:
                 }
             
         except Exception as e:
-            logger.error(f"Error in complexity analysis: {str(e)}")
+            logger.error(f"$$$$Error in complexity analysis: {str(e)}")
             state["errors"].append(f"Complexity analysis error: {str(e)}")
             state["task_complexity"] = "complex"  # Default to complex on error
             state["classification_details"] = {
@@ -183,7 +183,7 @@ class OptimizedSuperAgent:
             employees = state["employees"]
             classification_details = state.get("classification_details", {})
             
-            logger.info("Handling simple task with optimized flow")
+            logger.info("$$$$Handling simple task with optimized flow")
             
             # Find the most cost-effective available employee
             cost_efficient_employees = self._calculate_employee_cost_efficiency(employees)
@@ -269,18 +269,27 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
             }
             
             state["task_allocations"] = [allocation]
-            state["feature_spec"] = {
-                "title": "Simple Task",
-                "description": requirement.requirement_text,
-                "priority": requirement.priority,
-                "estimated_effort": f"{task.estimated_duration_hours} hours",
-                "classification_details": classification_details
-            }
+            
+            # Create proper FeatureSpec object for simple tasks
+            state["feature_spec"] = FeatureSpec(
+                title="Simple Task",
+                description=requirement.requirement_text,
+                user_stories=[
+                    f"As a user, I want {requirement.requirement_text[:100]}{'...' if len(requirement.requirement_text) > 100 else ''} so that I can achieve my goals efficiently."
+                ],
+                acceptance_criteria=[
+                    f"Given the task is completed, when the user reviews the result, then the requirement '{requirement.requirement_text[:50]}{'...' if len(requirement.requirement_text) > 50 else ''}' should be fulfilled.",
+                    f"Given the task is implemented, when tested, then it should work as expected within {task.estimated_duration_hours} hours of effort."
+                ],
+                priority=Priority(requirement.priority),
+                estimated_effort=f"{task.estimated_duration_hours} hours",
+                dependencies=classification_details.get("dependencies", [])
+            )
             
             logger.info(f"Simple task assigned to {selected_employee.get('name')} with {task.estimated_duration_hours}h estimate (AI confidence: {confidence:.2f})")
             
         except Exception as e:
-            logger.error(f"Error handling simple task: {str(e)}")
+            logger.error(f"$$$$Error handling simple task: {str(e)}")
             state["errors"].append(f"Simple task handler error: {str(e)}")
             state["success"] = False
         
@@ -327,7 +336,7 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
             return result
             
         except Exception as e:
-            logger.error(f"Error in requirement processing: {str(e)}")
+            logger.error(f"$$$$Error in requirement processing: {str(e)}")
             processing_time = time.time() - start_time
             
             return ProcessingResult(
@@ -342,12 +351,12 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
         """Fetch organization and employee data."""
         try:
             requirement = state["requirement"]
-            logger.info(f"Fetching org data for {requirement.org_id}")
+            logger.info(f"$$$$Fetching org data for {requirement.org_id}")
             
             # Get organization
             org = db.organizations.find_one({"_id":  ObjectId(requirement.org_id)})
             if not org:
-                raise ValueError(f"Organization {requirement.org_id} not found")
+                raise ValueError(f"$$$$Organization {requirement.org_id} not found")
             
             # Get employees
             employees = list(db.users.find({
@@ -364,7 +373,7 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
             logger.info(f"Fetched data for org {org['name']} with {len(employees)} employees")
             
         except Exception as e:
-            logger.error(f"Error fetching org data: {str(e)}")
+            logger.error(f"$$$$Error fetching org data: {str(e)}")
             state["errors"].append(f"Org data fetch error: {str(e)}")
             state["success"] = False
         
@@ -373,7 +382,7 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
     async def _run_product_manager(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Run the Product Manager Agent."""
         try:
-            logger.info("Running Product Manager Agent")
+            logger.info("$$$$Running Product Manager Agent")
             
             input_data = {
                 "requirement": state["requirement"],
@@ -386,12 +395,12 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
                 state["feature_spec"] = response.data.get("feature_spec")
                 logger.info("Product Manager Agent completed successfully")
             else:
-                logger.error(f"Product Manager Agent failed: {response.error}")
+                logger.error(f"$$$$Product Manager Agent failed: {response.error}")
                 state["errors"].append(f"Product Manager error: {response.error}")
                 state["success"] = False
                 
         except Exception as e:
-            logger.error(f"Error in Product Manager Agent: {str(e)}")
+            logger.error(f"$$$$Error in Product Manager Agent: {str(e)}")
             state["errors"].append(f"Product Manager error: {str(e)}")
             state["success"] = False
         
@@ -400,7 +409,7 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
     async def _run_architect(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Run the Architecture Agent."""
         try:
-            logger.info("Running Architecture Agent")
+            logger.info("$$$$Running Architecture Agent")
             
             if not state["feature_spec"]:
                 logger.warning("No feature spec available, skipping Architecture Agent")
@@ -418,12 +427,12 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
                 state["architecture"] = response.data.get("architecture")
                 logger.info("Architecture Agent completed successfully")
             else:
-                logger.error(f"Architecture Agent failed: {response.error}")
+                logger.error(f"$$$$Architecture Agent failed: {response.error}")
                 state["errors"].append(f"Architecture error: {response.error}")
                 state["success"] = False
                 
         except Exception as e:
-            logger.error(f"Error in Architecture Agent: {str(e)}")
+            logger.error(f"$$$$Error in Architecture Agent: {str(e)}")
             state["errors"].append(f"Architecture error: {str(e)}")
             state["success"] = False
         
@@ -432,7 +441,7 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
     async def _run_employee_allocator(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Run the Employee Allocator Agent."""
         try:
-            logger.info("Running Employee Allocator Agent")
+            logger.info("$$$$Running Employee Allocator Agent")
             
             if not state["feature_spec"] or not state["architecture"]:
                 logger.warning("Missing feature spec or architecture, skipping Employee Allocator")
@@ -449,15 +458,15 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
             
             if response.success:
                 state["task_allocations"] = response.data.get("task_allocations", [])
-                logger.info(f"Employee Allocator completed with {len(state['task_allocations'])} allocations")
+                logger.info(f"$$$$Employee Allocator completed with {len(state['task_allocations'])} allocations")
                 logger.info(f"Task Allocations: {state['task_allocations']}")
             else:
-                logger.error(f"Employee Allocator failed: {response.error}")
+                logger.error(f"$$$$Employee Allocator failed: {response.error}")
                 state["errors"].append(f"Employee Allocator error: {response.error}")
                 state["success"] = False
                 
         except Exception as e:
-            logger.error(f"Error in Employee Allocator Agent: {str(e)}")
+            logger.error(f"$$$$Error in Employee Allocator Agent: {str(e)}")
             state["errors"].append(f"Employee Allocator error: {str(e)}")
             state["success"] = False
         
@@ -466,7 +475,7 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
     async def _send_emails(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Send optimized task allocation emails."""
         try:
-            logger.info("Sending optimized task allocation emails")
+            logger.info("$$$$Sending optimized task allocation emails")
             
             task_allocations = state.get("task_allocations", [])
             if not task_allocations:
@@ -520,7 +529,7 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
                         })
                         
                     except Exception as e:
-                        logger.error(f"Error sending email for task {task.get('title')}: {str(e)}")
+                        logger.error(f"$$$$Error sending email for task {task.get('title')}: {str(e)}")
                         failed_count += 1
                         email_results.append({
                             "employee_email": employee_email,
@@ -540,10 +549,10 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
                 "results": email_results
             }
             
-            logger.info(f"Email sending completed: {successful_count} successful, {failed_count} failed")
+            logger.info(f"$$$$Email sending completed: {successful_count} successful, {failed_count} failed")
             
         except Exception as e:
-            logger.error(f"Error sending emails: {str(e)}")
+            logger.error(f"$$$$Error sending emails: {str(e)}")
             state["errors"].append(f"Email error: {str(e)}")
             state["email_results"] = {"status": "failed", "error": str(e)}
         
@@ -552,7 +561,7 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
     async def _save_results(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Save optimized processing results to database with metrics."""
         try:
-            logger.info("Saving optimized processing results")
+            logger.info("$$$$Saving optimized processing results into the db")
             
             # Calculate optimization metrics
             task_allocations = state.get("task_allocations", [])
@@ -644,7 +653,7 @@ Additional Context: {requirement.additional_context or 'None provided'}"""
             logger.info(f"  - Classification Reasoning: {classification_details.get('reasoning', 'N/A')[:100]}...")
             
         except Exception as e:
-            logger.error(f"Error saving optimized results: {str(e)}")
+            logger.error(f"$$$$Error saving optimized results: {str(e)}")
             state["errors"].append(f"Save error: {str(e)}")
         
         return state
